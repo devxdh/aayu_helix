@@ -2,11 +2,12 @@
 # Multi-stage production Dockerfile for Triage (Debian Slim - Rock-Solid glibc)
 # -----------------------------------------------------------------------------
 
-FROM node:20-slim AS base
+FROM node:22-slim AS base
 WORKDIR /app
 
-# 1. Install dependencies (better-sqlite3 uses official prebuilt glibc binaries)
+# 1. Install dependencies (Node 22 engine natively supported by better-sqlite3)
 FROM base AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 
