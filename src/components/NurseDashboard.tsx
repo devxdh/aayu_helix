@@ -10,6 +10,8 @@ import {
   SlidersHorizontal,
   PhoneCall,
   Check,
+  Search,
+  X,
 } from 'lucide-react';
 
 interface NurseDashboardProps {
@@ -39,6 +41,7 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
     null
   );
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | PriorityLevel>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   React.useEffect(() => {
     if (highlightedToken) {
@@ -55,6 +58,15 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
   const displayedPatients = patients.filter((p) => {
     if (priorityFilter !== 'ALL' && p.currentPriority !== priorityFilter) {
       return false;
+    }
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesName = p.patientName.toLowerCase().includes(q);
+      const matchesComplaint = p.chiefComplaint.toLowerCase().includes(q);
+      const matchesToken = p.tokenNumber.toLowerCase().includes(q);
+      if (!matchesName && !matchesComplaint && !matchesToken) {
+        return false;
+      }
     }
     return p.status === 'WAITING' || p.status === 'IN_CONSULTATION';
   });
@@ -144,23 +156,74 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
         </div>
       </div>
 
+      {/* Search & Filter Utility Bar */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by patient name, symptoms (chest pain, fever, saas...), or token #..."
+            className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end text-xs text-slate-500 font-medium">
+          {searchQuery ? (
+            <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
+              Found {displayedPatients.length} match{displayedPatients.length === 1 ? '' : 'es'}
+            </span>
+          ) : (
+            <span className="text-slate-400 text-xs">
+              Showing {displayedPatients.length} active patient{displayedPatients.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Patient Queue Cards List */}
       <div className="space-y-3">
         {displayedPatients.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-2xs">
-            <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mx-auto">
+              {searchQuery ? <Search className="w-5 h-5 text-slate-400" /> : <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
             </div>
-            <h3 className="text-sm font-bold text-slate-800">Queue is Clear</h3>
+            <h3 className="text-sm font-bold text-slate-800">
+              {searchQuery ? 'No Matching Patients Found' : 'Queue is Clear'}
+            </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              No patients are waiting under this filter.
+              {searchQuery
+                ? `No active patients matched "${searchQuery}". Check the spelling or clear the search query.`
+                : 'No patients are waiting under this filter.'}
             </p>
-            <button
-              onClick={onNavigateToRegister}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition"
-            >
-              + Register New Patient
-            </button>
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition"
+              >
+                Clear Search Filter
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onNavigateToRegister}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition"
+              >
+                + Register New Patient
+              </button>
+            )}
           </div>
         ) : (
           displayedPatients.map((patient, index) => {

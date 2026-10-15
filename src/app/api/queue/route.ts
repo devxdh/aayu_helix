@@ -12,16 +12,46 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status') as PatientStatus | null;
     const dateParam = searchParams.get('date'); // Format: YYYY-MM-DD
+    const searchParam = searchParams.get('search'); // Name, symptom, or token query
 
-    const patients = opdStore.getPatients(statusParam || undefined, dateParam || undefined);
+    const { version, lastModified } = opdStore.getQueueVersion();
+    const etag = `"${version}-${statusParam || 'all'}-${dateParam || 'all'}-${searchParam || 'none'}"`;
+    const clientEtag = request.headers.get('if-none-match');
+
+    if (clientEtag === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          'ETag': etag,
+          'Cache-Control': 'no-cache, must-revalidate',
+          'Last-Modified': new Date(lastModified).toUTCString(),
+        },
+      });
+    }
+
+    const patients = opdStore.getPatients(
+      statusParam || undefined,
+      dateParam || undefined,
+      searchParam || undefined
+    );
     const summary = opdStore.getQueueSummary();
 
-    return NextResponse.json({
-      success: true,
-      patients,
-      summary,
-      staffProfiles: DEFAULT_STAFF_PROFILES,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        patients,
+        summary,
+        staffProfiles: DEFAULT_STAFF_PROFILES,
+        version,
+      },
+      {
+        headers: {
+          'ETag': etag,
+          'Cache-Control': 'no-cache, must-revalidate',
+          'Last-Modified': new Date(lastModified).toUTCString(),
+        },
+      }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch queue';
     return NextResponse.json({ success: false, error: message }, { status: 500 });

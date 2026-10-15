@@ -27,10 +27,29 @@ export default function OPDPlatformPage() {
   const [isPolling] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch queue data
+  const queueEtagRef = React.useRef<string | null>(null);
+
+  // Fetch queue data with ETag support
   const fetchQueueData = useCallback(async () => {
     try {
-      const res = await fetch('/api/queue', { cache: 'no-store' });
+      const headers: Record<string, string> = {};
+      if (queueEtagRef.current) {
+        headers['If-None-Match'] = queueEtagRef.current;
+      }
+
+      const res = await fetch('/api/queue', {
+        headers,
+        cache: 'no-store',
+      });
+
+      if (res.status === 304) {
+        // Not modified: Queue data has not changed, 0 bytes transferred
+        return;
+      }
+
+      const etag = res.headers.get('ETag');
+      if (etag) queueEtagRef.current = etag;
+
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -61,22 +80,44 @@ export default function OPDPlatformPage() {
     }
   }, []);
 
-  // Combined fetch
+  // Combined fetch for initial boot or manual refresh
   const refreshAll = useCallback(async () => {
     await Promise.all([fetchQueueData(), fetchAuditData()]);
     setIsLoading(false);
   }, [fetchQueueData, fetchAuditData]);
 
-  // Initial load + 2-second real-time polling hook
+  // Initial load + smart adaptive polling hook
   useEffect(() => {
     refreshAll();
-    const interval = setInterval(() => {
-      fetchQueueData();
-      fetchAuditData();
-    }, 2000);
 
-    return () => clearInterval(interval);
-  }, [refreshAll, fetchQueueData, fetchAuditData]);
+    const interval = setInterval(() => {
+      // Pause polling if user is tabbed away or window is minimized
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+
+      // Smart tab-aware polling: only poll what the nurse is actively viewing
+      if (activeTab === 'DASHBOARD') {
+        fetchQueueData();
+      } else if (activeTab === 'AUDIT') {
+        fetchAuditData();
+      }
+    }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (activeTab === 'DASHBOARD') fetchQueueData();
+        if (activeTab === 'AUDIT') fetchAuditData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeTab, refreshAll, fetchQueueData, fetchAuditData]);
 
   // Handle clinical nurse override
   const handleCommitOverride = async (

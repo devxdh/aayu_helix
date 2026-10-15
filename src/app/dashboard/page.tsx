@@ -26,9 +26,27 @@ function DashboardContent() {
   const [isPolling] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const queueEtagRef = React.useRef<string | null>(null);
+
   const fetchQueueData = useCallback(async () => {
     try {
-      const res = await fetch('/api/queue', { cache: 'no-store' });
+      const headers: Record<string, string> = {};
+      if (queueEtagRef.current) {
+        headers['If-None-Match'] = queueEtagRef.current;
+      }
+
+      const res = await fetch('/api/queue', {
+        headers,
+        cache: 'no-store',
+      });
+
+      if (res.status === 304) {
+        return;
+      }
+
+      const etag = res.headers.get('ETag');
+      if (etag) queueEtagRef.current = etag;
+
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -46,8 +64,26 @@ function DashboardContent() {
 
   useEffect(() => {
     fetchQueueData();
-    const interval = setInterval(fetchQueueData, 2000);
-    return () => clearInterval(interval);
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      fetchQueueData();
+    }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchQueueData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchQueueData]);
 
   const handleCommitOverride = async (

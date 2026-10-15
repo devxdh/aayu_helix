@@ -50,8 +50,26 @@ export default function AuditPage() {
 
   useEffect(() => {
     fetchAuditData();
-    const interval = setInterval(fetchAuditData, 2000);
-    return () => clearInterval(interval);
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      fetchAuditData();
+    }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAuditData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchAuditData]);
 
   const handleReset = async () => {

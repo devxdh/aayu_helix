@@ -198,6 +198,27 @@ async function runAllTests() {
     'Audit entry contains valid ISO timestamp with date and time'
   );
 
+  // TEST SUITE 8: Patient Search by Name, Symptoms, Token & Caching Versioning
+  console.log('\n--- Suite 8: Live Queue Search & Caching Versioning ---');
+  const vBefore = opdStore.getQueueVersion().version;
+  assert(typeof vBefore === 'number' && vBefore > 0, 'Queue version is a positive number');
+
+  // Search by name
+  const searchName = opdStore.getPatients(undefined, undefined, 'Anil');
+  assert(searchName.some((p) => p.patientName.includes('Anil')), 'Search by patient name finds Anil Sharma');
+
+  // Search by symptom / chief complaint
+  const searchSymptom = opdStore.getPatients(undefined, undefined, 'sprain');
+  assert(searchSymptom.some((p) => p.chiefComplaint.includes('sprain')), 'Search by symptom finds wrist sprain');
+
+  // Search by token number
+  const searchToken = opdStore.getPatients(undefined, undefined, '777');
+  assert(searchToken.some((p) => p.tokenNumber === '777'), 'Search by token finds Token 777');
+
+  // Negative search
+  const searchNone = opdStore.getPatients(undefined, undefined, 'nonexistent_symptom_xyz');
+  assert(searchNone.length === 0, 'Nonexistent symptom search returns 0 patients');
+
   console.log('\n========================================================');
   console.log(`Results: ${passedCount} passed, ${failedCount} failed out of ${passedCount + failedCount} tests.`);
   console.log('========================================================\n');

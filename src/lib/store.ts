@@ -209,10 +209,24 @@ class OPDStore {
   private auditLogs: AuditEntry[] = [];
   private sequenceCounter: number = 100;
   private tokenIndexCounter: number = 135;
+  private queueVersion: number = 1;
+  private lastModifiedTimestamp: number = Date.now();
 
   constructor() {
     this.initializeFromWalOrSeed();
     this.syncFromPostgresIfAvailable();
+  }
+
+  public getQueueVersion(): { version: number; lastModified: number } {
+    return {
+      version: this.queueVersion,
+      lastModified: this.lastModifiedTimestamp,
+    };
+  }
+
+  private markModified(): void {
+    this.queueVersion++;
+    this.lastModifiedTimestamp = Date.now();
   }
 
   private async syncFromPostgresIfAvailable(): Promise<void> {
@@ -398,14 +412,25 @@ class OPDStore {
         timestamp: arrivedTime,
       });
     }
+    this.markModified();
   }
 
-  public getPatients(filterStatus?: PatientStatus, targetDate?: string): Patient[] {
+  public getPatients(filterStatus?: PatientStatus, targetDate?: string, searchQuery?: string): Patient[] {
     const list = Array.from(this.patients.values());
     let filtered = filterStatus ? list.filter((p) => p.status === filterStatus) : list;
 
     if (targetDate) {
       filtered = filtered.filter((p) => p.createdAt.startsWith(targetDate));
+    }
+
+    if (searchQuery && searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((p) => {
+        const matchesName = p.patientName.toLowerCase().includes(q);
+        const matchesComplaint = p.chiefComplaint.toLowerCase().includes(q);
+        const matchesToken = p.tokenNumber.toLowerCase().includes(q);
+        return matchesName || matchesComplaint || matchesToken;
+      });
     }
 
     return filtered.sort((a, b) => {
@@ -556,6 +581,7 @@ class OPDStore {
       timestamp: now,
     });
 
+    this.markModified();
     return patient;
   }
 
@@ -626,6 +652,7 @@ class OPDStore {
       timestamp: now,
     });
 
+    this.markModified();
     return patient;
   }
 
@@ -671,6 +698,7 @@ class OPDStore {
       timestamp: now,
     });
 
+    this.markModified();
     return patient;
   }
 
