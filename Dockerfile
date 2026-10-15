@@ -30,15 +30,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 nextjs
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data && chmod -R 777 /app/data
+RUN mkdir -p /app/data && chmod -R 777 /app/data
 
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
-
-USER nextjs
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 EXPOSE 3000
 
