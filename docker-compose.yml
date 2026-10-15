@@ -6,7 +6,6 @@ services:
     container_name: triage_app_service
     restart: unless-stopped
     ports:
-      - "80:3000"
       - "3000:3000"
     environment:
       - NODE_ENV=production
@@ -21,3 +20,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  caddy:
+    image: caddy:alpine
+    container_name: triage_caddy_gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - triage-app
+
+volumes:
+  caddy_data:
+  caddy_config:

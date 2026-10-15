@@ -1,0 +1,20 @@
+{
+    # Global options
+    auto_https disable_redirects
+}
+
+# 1. Trusted public SSL certificate for any device/phone (Evaluators, Mobile, Laptop)
+65.1.112.17.sslip.io {
+    reverse_proxy triage-app:3000
+}
+
+# 2. Raw IP over HTTPS (handles devices that force https://65.1.112.17)
+https://65.1.112.17 {
+    tls internal
+    reverse_proxy triage-app:3000
+}
+
+# 3. Raw IP over HTTP
+http://65.1.112.17 {
+    reverse_proxy triage-app:3000
+}
