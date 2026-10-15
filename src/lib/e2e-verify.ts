@@ -12,8 +12,7 @@ import { opdStore } from './store';
 
 async function runE2EVerification() {
   console.log('================================================================');
-  console.log('🏥 OPD FLOW: END-TO-END CLINICAL & AUDIT VERIFICATION');
-  console.log('   Dr. S.N. Medical College, Jodhpur (Aayu 2026 Track 01)');
+  console.log('   Clinical Outpatient Department Priority & Triage Platform');
   console.log('================================================================\n');
 
   // Step 1: Reset store to deterministic seeds

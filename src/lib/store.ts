@@ -1,6 +1,5 @@
 /**
- * In-memory thread-safe singleton state store with Write-Ahead Log (WAL) durability.
- * Developed for Dr. S.N. Medical College, Jodhpur (Aayu 2026 Hackathon Track 01).
+ * In-memory thread-safe state store with Write-Ahead Log (WAL) durability and caching.
  *
  * Persistence Model:
  * 1. Synchronous WAL writes: Every change is committed to data/opd_wal.jsonl immediately.

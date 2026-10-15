@@ -4,7 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Triage | Clinical Patient Prioritization System',
   description:
-    'Deterministic, explainable clinical triage and patient queue prioritization for outpatient departments. Dr. S.N. Medical College Jodhpur.',
+    'Deterministic, explainable clinical triage and intelligent queue prioritization for outpatient departments.',
 };
 
 export default function RootLayout({

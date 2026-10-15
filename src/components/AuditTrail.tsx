@@ -110,7 +110,7 @@ export const AuditTrail: React.FC<AuditTrailProps> = ({ auditLogs, onRefresh }) 
               </span>
             </h2>
             <p className="text-xs text-slate-500">
-              Dr. S.N. Medical College OPD Governance • Tamper-Evident Event Logging (WAL Log)
+              OPD Clinical Governance • Tamper-Evident Event Logging (WAL Journal)
             </p>
           </div>
         </div>

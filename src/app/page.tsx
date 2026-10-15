@@ -246,12 +246,12 @@ export default function OPDPlatformPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-3.5 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
-          <span>
-            Dr. S.N. Medical College, Jodhpur • Triage Clinical Prioritization System
+      <footer className="border-t border-slate-200/80 bg-white py-3.5 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-2">
+          <span className="font-medium text-slate-700">
+            Triage • Clinical Prioritization System
           </span>
-          <span className="font-mono text-[11px] text-slate-500">
+          <span className="font-mono text-[11px] text-slate-400">
             Emergency & Outpatient Care
           </span>
         </div>

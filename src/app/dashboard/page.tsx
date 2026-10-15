@@ -185,10 +185,10 @@ function DashboardContent() {
           />
         )}
       </main>
-      <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
-          <span>Dr. S.N. Medical College, Jodhpur • Nursing & Triage Workstation</span>
-          <span className="font-mono text-[11px] text-slate-500">Aayu 2026 AI Medical Hackathon • Track 01</span>
+      <footer className="border-t border-slate-200/80 bg-white py-3.5 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-2">
+          <span className="font-medium text-slate-700">Nursing & Triage Workstation</span>
+          <span className="font-mono text-[11px] text-slate-400">Live Clinical Queue</span>
         </div>
       </footer>
     </div>

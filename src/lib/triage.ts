@@ -1,6 +1,5 @@
 /**
- * Clinical Triage Rules Engine for Indian OPD Workflows.
- * Developed for Dr. S.N. Medical College, Jodhpur (Aayu 2026 Hackathon - Track 01).
+ * Clinical Triage Rules Engine for High-Volume Outpatient Workflows.
  *
  * Implements deterministic clinical triage based on Emergency Triage protocols
  * (Manchester Triage System adapted for high-volume Indian Outpatient Departments).
