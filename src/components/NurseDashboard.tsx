@@ -42,18 +42,70 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
   );
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | PriorityLevel>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeFocusedToken, setActiveFocusedToken] = useState<string | null>(highlightedToken || null);
 
-  React.useEffect(() => {
+  const scrollTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const fadeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const focusPatientCard = React.useCallback((token: string) => {
+    setActiveFocusedToken(token);
+    setPriorityFilter('ALL');
+    setSearchQuery('');
+
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+
+    // Allow DOM to finish sorting and reflow before smooth scrolling
+    scrollTimerRef.current = setTimeout(() => {
+      const el = document.getElementById(`patient-card-${token}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+
+    // Auto-dismiss the highlight after 5 seconds so it feels smooth and natural
+    fadeTimerRef.current = setTimeout(() => {
+      setActiveFocusedToken((current) => (current === token ? null : current));
+    }, 5000);
+  }, []);
+
+  useEffect(() => {
     if (highlightedToken) {
-      setPriorityFilter('ALL');
-      setTimeout(() => {
-        const el = document.getElementById(`patient-card-${highlightedToken}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 150);
+      focusPatientCard(highlightedToken);
     }
-  }, [highlightedToken]);
+  }, [highlightedToken, focusPatientCard]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    };
+  }, []);
+
+  const handleCommitOverrideInternal = async (
+    patientId: string,
+    newPriority: PriorityLevel,
+    justification: string
+  ) => {
+    const targetPatient = patients.find((p) => p.id === patientId);
+    const token = targetPatient?.tokenNumber;
+    await onCommitOverride(patientId, newPriority, justification);
+    if (token) {
+      focusPatientCard(token);
+    }
+  };
+
+  const handleUpdateStatusInternal = async (
+    patientId: string,
+    status: 'WAITING' | 'IN_CONSULTATION' | 'COMPLETED'
+  ) => {
+    const targetPatient = patients.find((p) => p.id === patientId);
+    const token = targetPatient?.tokenNumber;
+    await onUpdateStatus(patientId, status);
+    if (token && status !== 'COMPLETED') {
+      focusPatientCard(token);
+    }
+  };
 
   const displayedPatients = patients.filter((p) => {
     if (priorityFilter !== 'ALL' && p.currentPriority !== priorityFilter) {
@@ -237,14 +289,19 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
               patient.vitals.spo2 ||
               patient.vitals.temperature;
 
-            const isHighlighted = highlightedToken && patient.tokenNumber === highlightedToken;
+            const isHighlighted = activeFocusedToken && patient.tokenNumber === activeFocusedToken;
 
             return (
               <div
                 key={patient.id}
                 id={`patient-card-${patient.tokenNumber}`}
-                className={`bg-white rounded-2xl border transition-all p-4 sm:p-5 shadow-2xs hover:shadow-xs ${
-                  isHighlighted ? 'ring-3 ring-blue-500 shadow-md animate-pulse' : ''
+                onClick={() => {
+                  if (isHighlighted) setActiveFocusedToken(null);
+                }}
+                className={`bg-white rounded-2xl border transition-all duration-300 p-4 sm:p-5 shadow-2xs hover:shadow-xs relative ${
+                  isHighlighted
+                    ? 'ring-2 ring-blue-600 ring-offset-2 shadow-lg bg-blue-50/40'
+                    : ''
                 } ${
                   isImmediate
                     ? 'border-l-6 border-l-red-600 border-slate-200 bg-red-50/20'
@@ -253,6 +310,12 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
                     : 'border-l-6 border-l-emerald-500 border-slate-200'
                 }`}
               >
+                {isHighlighted && (
+                  <div className="absolute -top-2.5 left-6 bg-blue-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1.5 z-10 animate-in fade-in zoom-in-95 duration-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span>Focused Patient #{patient.tokenNumber}</span>
+                  </div>
+                )}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   {/* Left: Token & Patient Info */}
                   <div className="flex items-start gap-4">
@@ -374,7 +437,7 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
                     {patient.status === 'WAITING' ? (
                       <button
                         type="button"
-                        onClick={() => onUpdateStatus(patient.id, 'IN_CONSULTATION')}
+                        onClick={() => handleUpdateStatusInternal(patient.id, 'IN_CONSULTATION')}
                         className="flex-1 md:flex-initial w-full px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition shadow-2xs flex items-center justify-center gap-1.5"
                       >
                         <PhoneCall className="w-3.5 h-3.5" />
@@ -383,7 +446,7 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onUpdateStatus(patient.id, 'COMPLETED')}
+                        onClick={() => handleUpdateStatusInternal(patient.id, 'COMPLETED')}
                         className="flex-1 md:flex-initial w-full px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs flex items-center justify-center gap-1.5"
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -405,7 +468,7 @@ export const NurseDashboard: React.FC<NurseDashboardProps> = ({
           activeStaff={activeStaff}
           isOpen={true}
           onClose={() => setSelectedPatientForOverride(null)}
-          onCommitOverride={onCommitOverride}
+          onCommitOverride={handleCommitOverrideInternal}
         />
       )}
     </div>

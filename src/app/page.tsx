@@ -140,6 +140,10 @@ export default function OPDPlatformPage() {
       throw new Error(data.error || 'Failed to commit override');
     }
 
+    if (data.patient?.tokenNumber) {
+      setHighlightedToken(data.patient.tokenNumber);
+    }
+
     await refreshAll();
   };
 
@@ -158,6 +162,10 @@ export default function OPDPlatformPage() {
     });
 
     if (res.ok) {
+      const data = await res.json();
+      if (data.patient?.tokenNumber && status !== 'COMPLETED') {
+        setHighlightedToken(data.patient.tokenNumber);
+      }
       await refreshAll();
     }
   };

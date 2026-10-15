@@ -10,6 +10,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tokenParam = searchParams.get('token');
+  const [highlightedToken, setHighlightedToken] = useState<string | null>(tokenParam);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [summary, setSummary] = useState<QueueSummary>({
     totalWaiting: 0,
@@ -86,6 +87,12 @@ function DashboardContent() {
     };
   }, [fetchQueueData]);
 
+  useEffect(() => {
+    if (tokenParam) {
+      setHighlightedToken(tokenParam);
+    }
+  }, [tokenParam]);
+
   const handleCommitOverride = async (
     patientId: string,
     newPriority: PriorityLevel,
@@ -106,6 +113,10 @@ function DashboardContent() {
       throw new Error(data.error || 'Failed to commit override');
     }
 
+    if (data.patient?.tokenNumber) {
+      setHighlightedToken(data.patient.tokenNumber);
+    }
+
     await fetchQueueData();
   };
 
@@ -122,7 +133,13 @@ function DashboardContent() {
       }),
     });
 
-    if (res.ok) await fetchQueueData();
+    if (res.ok) {
+      const data = await res.json();
+      if (data.patient?.tokenNumber && status !== 'COMPLETED') {
+        setHighlightedToken(data.patient.tokenNumber);
+      }
+      await fetchQueueData();
+    }
   };
 
   const handleReset = async () => {
@@ -161,7 +178,7 @@ function DashboardContent() {
             patients={patients}
             summary={summary}
             activeStaff={activeStaff}
-            highlightedToken={tokenParam}
+            highlightedToken={highlightedToken}
             onCommitOverride={handleCommitOverride}
             onUpdateStatus={handleUpdateStatus}
             onNavigateToRegister={() => router.push('/register')}
