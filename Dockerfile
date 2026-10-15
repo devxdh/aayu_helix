@@ -19,7 +19,7 @@ ENV NODE_ENV=production
 ENV NEXT_CPU_COUNT=1
 ENV NODE_OPTIONS="--max-old-space-size=768"
 
-RUN npm run build
+RUN npm run build && rm -rf .next/cache /root/.npm && find node_modules/better-sqlite3/prebuilds/ -mindepth 1 -maxdepth 1 ! -name '*linux-x64*' -exec rm -rf {} + 2>/dev/null || true
 
 # 3. Production runner (minimal standalone bundle)
 FROM node:22-slim AS runner
