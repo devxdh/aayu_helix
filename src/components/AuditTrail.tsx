@@ -164,7 +164,7 @@ export const AuditTrail: React.FC<AuditTrailProps> = ({ auditLogs, onRefresh }) 
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+        <div className="flex items-center gap-3 flex-1 min-w-70">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
@@ -204,7 +204,7 @@ export const AuditTrail: React.FC<AuditTrailProps> = ({ auditLogs, onRefresh }) 
                 <th className="py-3 px-4">Patient Name</th>
                 <th className="py-3 px-3">Event Type</th>
                 <th className="py-3 px-3">Priority Shift</th>
-                <th className="py-3 px-4 min-w-[260px]">Triggered Reason / Nurse Justification</th>
+                <th className="py-3 px-4 min-w-65">Triggered Reason / Nurse Justification</th>
                 <th className="py-3 px-3">Staff Badge ID</th>
               </tr>
             </thead>

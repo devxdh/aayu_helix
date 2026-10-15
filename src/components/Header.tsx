@@ -162,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                 const found = staffProfiles.find((s) => s.id === e.target.value);
                 if (found) onStaffChange(found);
               }}
-              className="bg-transparent text-slate-800 text-xs font-medium focus:outline-none cursor-pointer max-w-[140px] truncate"
+              className="bg-transparent text-slate-800 text-xs font-medium focus:outline-none cursor-pointer max-w-35 truncate"
             >
               {staffProfiles.map((s) => (
                 <option key={s.id} value={s.id} className="bg-white text-slate-800">
