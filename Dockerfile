@@ -5,7 +5,9 @@
 FROM node:22-slim AS builder
 WORKDIR /app
 
-# 1. Install dependencies directly (better-sqlite3 prebuilt glibc binary)
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# 1. Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit
 
