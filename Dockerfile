@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Multi-stage production Dockerfile for OPD Flow (Aayu 2026 Hackathon Track 01)
+# Multi-stage production Dockerfile for Triage (SQLite Native Engine)
 # -----------------------------------------------------------------------------
 
 FROM node:20-alpine AS base
@@ -7,7 +7,7 @@ WORKDIR /app
 
 # 1. Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -34,15 +34,17 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Create persistent data directory for Write-Ahead Log (WAL)
+# Create persistent data directory for SQLite & WAL
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data && chmod -R 777 /app/data
 
 COPY --from=builder /app/public ./public
 
 # Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy compiled better-sqlite3 native addon to ensure resolution in standalone runner
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 USER nextjs
 

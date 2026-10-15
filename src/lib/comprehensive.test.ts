@@ -14,7 +14,7 @@
 import { evaluateTriage } from './triage';
 import { walStorage } from './wal';
 import { opdStore } from './store';
-import { initializeDatabase, isPostgresConfigured } from './db';
+import { initializeDatabase } from './db';
 
 let passedCount = 0;
 let failedCount = 0;
@@ -147,13 +147,12 @@ async function runAllTests() {
   assert(latestOverrideAudit?.newPriority === 'IMMEDIATE', 'Audit trail records new priority');
   assert(latestOverrideAudit?.staffBadge === 'SN-402', 'Audit trail records staff badge attribution');
 
-  // TEST SUITE 6: PostgreSQL Adapter Resilience
-  console.log('\n--- Suite 6: PostgreSQL Database Adapter ---');
-  const pgConfigured = isPostgresConfigured();
-  console.log(`  ℹ️  PostgreSQL Configured via DATABASE_URL: ${pgConfigured}`);
-  // Even if PG is not running on host during CI/local build, initializeDatabase returns false gracefully without throwing
-  const initResult = await initializeDatabase();
-  assert(typeof initResult === 'boolean', 'Database adapter handles environment gracefully');
+  // TEST SUITE 6: SQLite Database Engine & Schema Validation
+  console.log('\n--- Suite 6: SQLite Database Engine ---');
+  const initResult = initializeDatabase();
+  assert(initResult === true, 'SQLite schema initialized successfully in data/triage.db');
+  const sqlitePatients = opdStore.getPatients();
+  assert(sqlitePatients.length > 0, 'SQLite contains active patients');
 
   // TEST SUITE 7: Manual Token Number & Duplicate Rejection & Audit Log Immutability
   console.log('\n--- Suite 7: Manual Token & Duplicate Prevention ---');

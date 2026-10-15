@@ -18,8 +18,16 @@ import {
 } from '@/types/triage';
 import { evaluateTriage } from './triage';
 import { walStorage, WalRecord } from './wal';
-import { getSql, isPostgresConfigured, initializeDatabase } from './db';
-import { seedPostgresDatabase } from './seed-db';
+import {
+  initializeDatabase,
+  getPatientsFromSqlite,
+  getAuditLogsFromSqlite,
+  savePatientToSqlite,
+  updateOverrideInSqlite,
+  updateStatusInSqlite,
+  appendAuditLogToSqlite,
+  seedDatabase,
+} from './db';
 
 export { DEFAULT_STAFF_PROFILES };
 
@@ -46,7 +54,7 @@ interface SeedPatientConfig {
   staffBadge: string;
 }
 
-const RICH_SEED_PATIENTS: SeedPatientConfig[] = [
+export const RICH_SEED_PATIENTS: SeedPatientConfig[] = [
   // 1. Mandatory Test Case 1: Token 87 (Chest Tightness in 60y - IMMEDIATE)
   {
     tokenNumber: '87',
@@ -212,8 +220,8 @@ class OPDStore {
   private lastModifiedTimestamp: number = Date.now();
 
   constructor() {
-    this.initializeFromWalOrSeed();
-    this.syncFromPostgresIfAvailable();
+    initializeDatabase();
+    this.syncFromSqlite();
   }
 
   public getQueueVersion(): { version: number; lastModified: number } {
@@ -228,46 +236,26 @@ class OPDStore {
     this.lastModifiedTimestamp = Date.now();
   }
 
-  private async syncFromPostgresIfAvailable(): Promise<void> {
-    if (!isPostgresConfigured()) return;
+  private syncFromSqlite(): void {
     try {
-      await initializeDatabase();
-      await seedPostgresDatabase();
-      const sql = getSql();
-      if (!sql) return;
-
-      const rows = await sql`
-        SELECT * FROM patients ORDER BY created_at ASC
-      `;
-
-      if (rows.length > 0) {
-        for (const r of rows) {
-          const patient: Patient = {
-            id: r.id,
-            tokenNumber: r.token_number,
-            patientName: r.patient_name,
-            age: r.age,
-            gender: r.gender,
-            chiefComplaint: r.chief_complaint,
-            vitals: (r.vitals as Record<string, unknown>) || {},
-            systemPriority: r.system_priority,
-            currentPriority: r.current_priority,
-            clinicalRationale: r.clinical_rationale,
-            matchedRules: Array.isArray(r.matched_rules) ? r.matched_rules : [],
-            isFailSafeEscalation: Boolean(r.is_fail_safe_escalation),
-            isOverridden: Boolean(r.is_overridden),
-            overrideJustification: r.override_reason || undefined,
-            overriddenBy: r.overridden_by || undefined,
-            overriddenAt: r.overridden_at ? new Date(r.overridden_at).toISOString() : undefined,
-            status: r.status,
-            createdAt: new Date(r.created_at).toISOString(),
-            updatedAt: new Date(r.updated_at).toISOString(),
-          };
-          this.patients.set(patient.id, patient);
+      const dbPatients = getPatientsFromSqlite();
+      if (dbPatients.length > 0) {
+        for (const p of dbPatients) {
+          this.patients.set(p.id, p);
         }
+      } else {
+        this.initializeFromWalOrSeed();
+      }
+
+      const dbAudits = getAuditLogsFromSqlite();
+      if (dbAudits.length > 0) {
+        this.auditLogs = dbAudits;
+        const maxSeq = Math.max(...dbAudits.map((a) => a.auditSequence), 100);
+        this.sequenceCounter = maxSeq;
       }
     } catch (err) {
-      console.warn('[Postgres Sync] Notice:', err);
+      console.warn('[SQLite Sync] Notice:', err);
+      this.initializeFromWalOrSeed();
     }
   }
 
@@ -362,55 +350,26 @@ class OPDStore {
     this.sequenceCounter = 100;
     this.tokenIndexCounter = 135;
 
-    const baseTime = Date.now();
+    // Seed SQLite tables and reload state
+    seedDatabase(true);
 
-    for (const seed of RICH_SEED_PATIENTS) {
-      const arrivedTime = new Date(baseTime - seed.minutesAgo * 60 * 1000).toISOString();
-      const input: TriageInput = {
-        patientName: seed.name,
-        age: seed.age,
-        gender: seed.gender,
-        chiefComplaint: seed.complaint,
-        vitals: seed.vitals,
-      };
-
-      const triage = evaluateTriage(input, arrivedTime);
-      const patient: Patient = {
-        id: `pat-${seed.tokenNumber}`,
-        tokenNumber: seed.tokenNumber,
-        ...input,
-        systemPriority: triage.priority,
-        currentPriority: triage.priority,
-        clinicalRationale: triage.clinicalRationale,
-        matchedRules: triage.matchedRules,
-        isFailSafeEscalation: triage.isFailSafeEscalation,
-        isOverridden: false,
-        status: 'WAITING',
-        createdAt: arrivedTime,
-        updatedAt: arrivedTime,
-      };
-
-      this.patients.set(patient.id, patient);
-
+    const seededPatients = getPatientsFromSqlite();
+    for (const p of seededPatients) {
+      this.patients.set(p.id, p);
       walStorage.appendRecord(
         'TOKEN_ISSUED',
-        patient.id,
-        patient.tokenNumber,
-        patient as unknown as Record<string, unknown>,
-        seed.staffBadge
+        p.id,
+        p.tokenNumber,
+        p as unknown as Record<string, unknown>,
+        p.overriddenBy || 'SYSTEM_SEED'
       );
-
-      this.recordAuditEntry({
-        tokenNumber: patient.tokenNumber,
-        patientId: patient.id,
-        patientName: patient.patientName,
-        eventType: 'TOKEN_ISSUED',
-        newPriority: patient.currentPriority,
-        justification: patient.clinicalRationale,
-        staffBadge: seed.staffBadge,
-        timestamp: arrivedTime,
-      });
     }
+
+    this.auditLogs = getAuditLogsFromSqlite();
+    if (this.auditLogs.length > 0) {
+      this.sequenceCounter = Math.max(...this.auditLogs.map((a) => a.auditSequence), 100);
+    }
+
     this.markModified();
   }
 
@@ -534,40 +493,8 @@ class OPDStore {
 
     this.patients.set(patient.id, patient);
 
-    // Asynchronously insert into PostgreSQL if configured
-    if (isPostgresConfigured()) {
-      const sql = getSql();
-      if (sql) {
-        sql`
-          INSERT INTO patients (
-            id, token_number, patient_name, age, gender, chief_complaint, vitals,
-            system_priority, current_priority, clinical_rationale, matched_rules,
-            is_fail_safe_escalation, is_overridden, status, created_at, updated_at
-          ) VALUES (
-            ${patient.id},
-            ${patient.tokenNumber},
-            ${patient.patientName},
-            ${patient.age},
-            ${patient.gender},
-            ${patient.chiefComplaint},
-            ${JSON.stringify(patient.vitals)},
-            ${patient.systemPriority},
-            ${patient.currentPriority},
-            ${patient.clinicalRationale},
-            ${JSON.stringify(patient.matchedRules)},
-            ${patient.isFailSafeEscalation},
-            ${patient.isOverridden},
-            ${patient.status},
-            ${patient.createdAt},
-            ${patient.updatedAt}
-          )
-          ON CONFLICT (id) DO UPDATE SET
-            current_priority = EXCLUDED.current_priority,
-            status = EXCLUDED.status,
-            updated_at = EXCLUDED.updated_at
-        `.catch((err) => console.warn('[Postgres Insert Patient] Notice:', err));
-      }
-    }
+    // Persist to SQLite
+    savePatientToSqlite(patient);
 
     this.recordAuditEntry({
       tokenNumber: patient.tokenNumber,
@@ -622,22 +549,8 @@ class OPDStore {
     patient.overriddenAt = now;
     this.patients.set(patientId, patient);
 
-    // Asynchronously update PostgreSQL if configured
-    if (isPostgresConfigured()) {
-      const sql = getSql();
-      if (sql) {
-        sql`
-          UPDATE patients SET
-            current_priority = ${newPriority},
-            is_overridden = TRUE,
-            override_reason = ${trimmedJustification},
-            overridden_by = ${staffBadge},
-            overridden_at = ${now},
-            updated_at = ${now}
-          WHERE id = ${patientId}
-        `.catch((err) => console.warn('[Postgres Update Override] Notice:', err));
-      }
-    }
+    // Persist to SQLite
+    updateOverrideInSqlite(patientId, newPriority, trimmedJustification, staffBadge, now);
 
     this.recordAuditEntry({
       tokenNumber: patient.tokenNumber,
@@ -674,17 +587,8 @@ class OPDStore {
     patient.status = status;
     patient.updatedAt = now;
 
-    if (isPostgresConfigured()) {
-      const sql = getSql();
-      if (sql) {
-        sql`
-          UPDATE patients SET
-            status = ${status},
-            updated_at = ${now}
-          WHERE id = ${patientId}
-        `.catch((err) => console.warn('[Postgres Update Status] Notice:', err));
-      }
-    }
+    // Persist to SQLite
+    updateStatusInSqlite(patientId, status, now);
 
     this.recordAuditEntry({
       tokenNumber: patient.tokenNumber,
@@ -746,30 +650,8 @@ class OPDStore {
     };
     this.auditLogs.unshift(fullEntry);
 
-    if (isPostgresConfigured()) {
-      const sql = getSql();
-      if (sql) {
-        sql`
-          INSERT INTO audit_logs (
-            id, audit_sequence, timestamp, token_number, patient_id, patient_name,
-            event_type, old_priority, new_priority, justification, staff_badge
-          ) VALUES (
-            ${fullEntry.id},
-            ${fullEntry.auditSequence},
-            ${fullEntry.timestamp},
-            ${fullEntry.tokenNumber},
-            ${fullEntry.patientId},
-            ${fullEntry.patientName},
-            ${fullEntry.eventType},
-            ${fullEntry.oldPriority || null},
-            ${fullEntry.newPriority},
-            ${fullEntry.justification},
-            ${fullEntry.staffBadge}
-          )
-          ON CONFLICT (id) DO NOTHING
-        `.catch((err) => console.warn('[Postgres Insert Audit] Notice:', err));
-      }
-    }
+    // Persist to SQLite
+    appendAuditLogToSqlite(fullEntry);
   }
 }
 
